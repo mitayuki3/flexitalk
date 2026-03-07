@@ -31,6 +31,26 @@ function openTutorial() {
     Neutralino.os.open("https://www.youtube.com/c/CodeZri");
 }
 
+async function llamaCompletion() {
+    const prompt = document.getElementById('prompt').value;
+    const apiUrl = document.getElementById('api-url').value.replace(/\/+$/, '');
+    const responseDiv = document.getElementById('response');
+    responseDiv.innerText = "Generating...";
+
+    try {
+        const response = await fetch(`${apiUrl}/completion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt, n_predict: 128 })
+        });
+        const data = await response.json();
+        responseDiv.innerText = data.content;
+    } catch (err) {
+        responseDiv.innerText = "Error: " + err.message;
+        console.error(err);
+    }
+}
+
 /*
     Function to set up a system tray menu with options specific to the window mode.
     This function checks if the application is running in window mode, and if so,

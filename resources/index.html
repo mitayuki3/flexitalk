@@ -15,6 +15,15 @@
         <a href="#" onclick="openDocs();">Docs</a> &middot;  
         <a href="#" onclick="openTutorial();">Video tutorial</a>
       </div>
+      <br/>
+      <div id="llamacpp-ui">
+        <input type="text" id="api-url" value="http://localhost:8080" placeholder="API Base URL" style="width: 300px;">
+        <br/><br/>
+        <textarea id="prompt" rows="4" cols="50" placeholder="Ask llama.cpp..."></textarea>
+        <br/>
+        <button onclick="llamaCompletion();">Generate</button>
+        <div id="response" style="margin-top: 10px; border: 1px solid #ccc; padding: 10px; min-height: 20px; white-space: pre-wrap;"></div>
+      </div>
     </div>
     <!-- Neutralino.js client. This file is gitignored, 
         because `neu update` typically downloads it.
