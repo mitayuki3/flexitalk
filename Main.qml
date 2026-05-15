@@ -1,45 +1,41 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Controls
+import QtQuick.Layouts
 
 Window {
     width: 640
     height: 480
     visible: true
-    title: qsTr("FlexiTalk (Hot Reload Enabled)")
+    title: qsTr("FlexiTalk")
 
     Rectangle {
         anchors.fill: parent
-        color: "#f0f0f0"
+        color: palette.window
 
-        Column {
-            anchors.centerIn: parent
-            spacing: 20
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 12
 
-            Text {
-                text: "FlexiTalk QML Window"
-                font.pixelSize: 24
-                anchors.horizontalCenter: parent.horizontalCenter
+            TextArea {
+                id: ttsInputTextEdit
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                placeholderText: "TTS入力文字列"
+                wrapMode: TextEdit.Wrap
             }
 
-            Text {
-                text: "このファイルを編集して保存すると、表示が更新されます。"
-                font.pixelSize: 16
-                color: "#666666"
-                anchors.horizontalCenter: parent.horizontalCenter
+            ComboBox {
+                id: voiceFileSettingComboBox
+                Layout.fillWidth: true
+                model: ["voice_a.wav", "voice_b.wav", "voice_c.wav"]
             }
 
-            Rectangle {
-                width: 100
-                height: 100
-                color: "lightgreen"
-                radius: 10
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "Edit Me!"
-                }
+            Button {
+                id: synthesizeButton
+                text: "合成"
+                Layout.fillWidth: true
             }
         }
     }
