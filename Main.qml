@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Controls.Universal
 
 ApplicationWindow {
     id: root
@@ -8,6 +9,9 @@ ApplicationWindow {
     height: 480
     visible: true
     title: qsTr("FlexiTalk")
+
+    Universal.theme: Universal.Dark
+
 
     SystemPalette {
         id: systemPalette
