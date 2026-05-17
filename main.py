@@ -1,4 +1,4 @@
-"""
+﻿"""
 Irodori-TTS ベースモデルを使用した Gradio GUI
 """
 
@@ -34,7 +34,7 @@ CODEC_DEVICE = default_runtime_device()
 MODEL_PRECISION = "bf16" if MODEL_DEVICE == "cuda" else "fp32"
 CODEC_PRECISION = "bf16" if CODEC_DEVICE == "cuda" else "fp32"
 
-OUT_DIR = Path("outputs")
+OUT_DIR = Path(os.environ.get("FLEXITALK_OUTPUT_DIR", "outputs"))
 VOICES_DIR = Path(os.environ.get("FLEXITALK_VOICES_DIR", "voices"))
 MAX_AUDIO_OUTPUTS = 20
 
@@ -231,6 +231,7 @@ def main() -> None:
     demo.launch(
         server_name="127.0.0.1",
         server_port=7860,
+        allowed_paths=[str(OUT_DIR), str(VOICES_DIR)],
     )
 
 
