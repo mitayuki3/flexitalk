@@ -8,7 +8,8 @@ from pathlib import Path
 import gradio as gr
 import numpy as np
 from huggingface_hub import hf_hub_download
-from pydub import AudioSegment
+import torch
+import torchaudio
 
 from irodori_tts.inference_runtime import (
     RuntimeKey,
@@ -18,6 +19,7 @@ from irodori_tts.inference_runtime import (
 )
 from voice_files import (
     NO_VOICE_OPTION,
+    VOICE_EXTENSIONS,
     VOICES_DIR,
     _get_output_subdir,
     get_voice_file_choices,
@@ -38,6 +40,9 @@ MAX_AUDIO_OUTPUTS = 20
 # チェックポイントパスをキャッシュ（毎回ダウンロードしない）
 _CHECKPOINT_PATH: str | None = None
 
+# 拡張子のドットを削除
+EXTENSION_CHOICES = [ext.lstrip(".") for ext in VOICE_EXTENSIONS]
+
 
 def _get_checkpoint_path() -> str:
     global _CHECKPOINT_PATH
@@ -53,7 +58,13 @@ def _extract_non_empty_lines(text: str) -> list[str]:
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
-def synthesize_text_lines(audio_outputs: list[str], text: str, voice_name: str, num_steps: int = 20):
+def synthesize_text_lines(
+    audio_outputs: list[str],
+    text: str,
+    voice_name: str,
+    num_steps: int = 20,
+    output_format: str = "ogg",
+):
     """テキストを行ごとに分割して合成し、生成された音声ファイルのパスをリストに追加して返すジェネレーター
 
     - 空行は無視
@@ -67,7 +78,7 @@ def synthesize_text_lines(audio_outputs: list[str], text: str, voice_name: str, 
         raise gr.Error(f"最大 {MAX_AUDIO_OUTPUTS} 行までです。")
 
     for i in range(min(len(lines), MAX_AUDIO_OUTPUTS)):
-        audio = synthesize(lines[i], voice_name, num_steps)
+        audio = synthesize(lines[i], voice_name, num_steps, output_format)
         audio_outputs.append(audio)
         yield audio_outputs
 
@@ -80,8 +91,10 @@ def _voice_list_dropdown() -> gr.Dropdown:
     )
 
 
-def synthesize(text: str, voice_name: str, num_steps: int = 20) -> str:
-    """テキストとボイス名を受け取り、MP3 ファイルのパスを返す。
+def synthesize(
+    text: str, voice_name: str, num_steps: int = 20, output_format: str = "ogg"
+) -> str:
+    """テキストとボイス名を受け取り、指定された形式の音声ファイルのパスを返す。
 
     初回呼び出し時にモデルをダウンロード＆ロード。
     2回目以降はキャッシュされたモデルを即座に再利用。
@@ -113,26 +126,16 @@ def synthesize(text: str, voice_name: str, num_steps: int = 20) -> str:
     )
     result = runtime.synthesize(req)
 
-    # torch.Tensor → numpy → pydub → MP3 に変換
-    audio_np = result.audio.cpu().numpy()
+    audio_tensor: torch.Tensor = result.audio.cpu()
     sample_rate = int(result.sample_rate)
 
-    # float32 numpy → pydub AudioSegment
-    audio_int16 = (audio_np * 32767).astype(np.int16)
-    segment = AudioSegment(
-        audio_int16.tobytes(),
-        frame_rate=sample_rate,
-        sample_width=2,  # 16bit
-        channels=1,
-    )
-
-    # ボイス名に応じたサブディレクトリに MP3 を保存
+    # ボイス名に応じたサブディレクトリに保存
     out_subdir = OUT_DIR / _get_output_subdir(voice_name)
     out_subdir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
-    tmp_path = str(out_subdir / f"{timestamp}.mp3")
-    segment.export(tmp_path, format="mp3")
+    tmp_path = str(out_subdir / f"{timestamp}.{output_format}")
+    torchaudio.save(tmp_path, audio_tensor, sample_rate)
 
     return tmp_path
 
@@ -160,12 +163,18 @@ with gr.Blocks(title="FlexiTalk") as demo:
                 value=20,
                 step=1,
             )
+            output_format_radio = gr.Radio(
+                label="出力形式",
+                choices=EXTENSION_CHOICES,
+                value="ogg",
+            )
             synthesize_btn = gr.Button(
                 "🔊 合成",
                 variant="primary",
                 size="lg",
             )
         with gr.Column(scale=1):
+
             @gr.render(inputs=audio_outputs)
             def render_audio_outputs(audio_list) -> None:
                 for i, audio in enumerate(audio_list):
@@ -175,12 +184,12 @@ with gr.Blocks(title="FlexiTalk") as demo:
                         interactive=False,
                         min_width=160,
                     )
+
             with gr.Accordion("情報", open=False):
                 gr.Markdown(
                     f"- モデル: `{HF_REPO_ID}`\n"
                     f"- デバイス: `{MODEL_DEVICE}`\n"
                     f"- 精度: `{MODEL_PRECISION}`\n"
-                    f"- 出力形式: MP3\n"
                 )
 
     refresh_voice_list_btn.click(
@@ -191,14 +200,26 @@ with gr.Blocks(title="FlexiTalk") as demo:
 
     synthesize_btn.click(
         fn=synthesize_text_lines,
-        inputs=[audio_outputs, text_input, voice_dropdown, num_steps_slider],
+        inputs=[
+            audio_outputs,
+            text_input,
+            voice_dropdown,
+            num_steps_slider,
+            output_format_radio,
+        ],
         outputs=audio_outputs,
     )
 
     # Enter キーでも合成実行
     text_input.submit(
         fn=synthesize_text_lines,
-        inputs=[audio_outputs, text_input, voice_dropdown, num_steps_slider],
+        inputs=[
+            audio_outputs,
+            text_input,
+            voice_dropdown,
+            num_steps_slider,
+            output_format_radio,
+        ],
         outputs=audio_outputs,
     )
 
