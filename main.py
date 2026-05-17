@@ -1,4 +1,4 @@
-"""
+﻿"""
 Irodori-TTS ベースモデルを使用した Gradio GUI
 """
 
@@ -33,6 +33,7 @@ MODEL_PRECISION = "bf16" if MODEL_DEVICE == "cuda" else "fp32"
 CODEC_PRECISION = "bf16" if CODEC_DEVICE == "cuda" else "fp32"
 
 OUT_DIR = Path("outputs")
+MAX_AUDIO_OUTPUTS = 20
 
 # チェックポイントパスをキャッシュ（毎回ダウンロードしない）
 _CHECKPOINT_PATH: str | None = None
@@ -46,6 +47,29 @@ def _get_checkpoint_path() -> str:
             filename=HF_FILENAME,
         )
     return _CHECKPOINT_PATH
+
+
+def _extract_non_empty_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def synthesize_text_lines(audio_outputs: list[str], text: str, voice_name: str, num_steps: int = 20):
+    """テキストを行ごとに分割して合成し、生成された音声ファイルのパスをリストに追加して返すジェネレーター
+
+    - 空行は無視
+    - 最大行数は `MAX_AUDIO_OUTPUTS` に制限
+    """
+    audio_outputs = list(audio_outputs)
+    lines = _extract_non_empty_lines(text)
+    if not lines:
+        raise gr.Error("テキストを入力してください。")
+    if len(lines) > MAX_AUDIO_OUTPUTS:
+        raise gr.Error(f"最大 {MAX_AUDIO_OUTPUTS} 行までです。")
+
+    for i in range(min(len(lines), MAX_AUDIO_OUTPUTS)):
+        audio = synthesize(lines[i], voice_name, num_steps)
+        audio_outputs.append(audio)
+        yield audio_outputs
 
 
 def _voice_list_dropdown() -> gr.Dropdown:
@@ -106,7 +130,7 @@ def synthesize(text: str, voice_name: str, num_steps: int = 20) -> str:
     out_subdir = OUT_DIR / _get_output_subdir(voice_name)
     out_subdir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
     tmp_path = str(out_subdir / f"{timestamp}.mp3")
     segment.export(tmp_path, format="mp3")
 
@@ -115,6 +139,8 @@ def synthesize(text: str, voice_name: str, num_steps: int = 20) -> str:
 
 # ── UI 構築 ───────────────────────────────────────────
 with gr.Blocks(title="FlexiTalk") as demo:
+    # 生成された音声ファイルのパスのリスト
+    audio_outputs = gr.State([])
     with gr.Row():
         with gr.Column(scale=1):
             text_input = gr.Textbox(
@@ -140,11 +166,15 @@ with gr.Blocks(title="FlexiTalk") as demo:
                 size="lg",
             )
         with gr.Column(scale=1):
-            audio_output = gr.Audio(
-                label="音声出力",
-                type="filepath",
-                interactive=False,
-            )
+            @gr.render(inputs=audio_outputs)
+            def render_audio_outputs(audio_list) -> None:
+                for i, audio in enumerate(audio_list):
+                    gr.Audio(
+                        value=audio,
+                        label=f"生成音声 {i + 1}",
+                        interactive=False,
+                        min_width=160,
+                    )
             with gr.Accordion("情報", open=False):
                 gr.Markdown(
                     f"- モデル: `{HF_REPO_ID}`\n"
@@ -160,16 +190,16 @@ with gr.Blocks(title="FlexiTalk") as demo:
     )
 
     synthesize_btn.click(
-        fn=synthesize,
-        inputs=[text_input, voice_dropdown, num_steps_slider],
-        outputs=audio_output,
+        fn=synthesize_text_lines,
+        inputs=[audio_outputs, text_input, voice_dropdown, num_steps_slider],
+        outputs=audio_outputs,
     )
 
     # Enter キーでも合成実行
     text_input.submit(
-        fn=synthesize,
-        inputs=[text_input, voice_dropdown, num_steps_slider],
-        outputs=audio_output,
+        fn=synthesize_text_lines,
+        inputs=[audio_outputs, text_input, voice_dropdown, num_steps_slider],
+        outputs=audio_outputs,
     )
 
 
