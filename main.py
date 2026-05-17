@@ -1,7 +1,8 @@
-﻿"""
+"""
 Irodori-TTS ベースモデルを使用した Gradio GUI
 """
 
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -20,7 +21,6 @@ from irodori_tts.inference_runtime import (
 from voice_files import (
     NO_VOICE_OPTION,
     VOICE_EXTENSIONS,
-    VOICES_DIR,
     _get_output_subdir,
     get_voice_file_choices,
 )
@@ -35,6 +35,7 @@ MODEL_PRECISION = "bf16" if MODEL_DEVICE == "cuda" else "fp32"
 CODEC_PRECISION = "bf16" if CODEC_DEVICE == "cuda" else "fp32"
 
 OUT_DIR = Path("outputs")
+VOICES_DIR = Path(os.environ.get("FLEXITALK_VOICES_DIR", "voices"))
 MAX_AUDIO_OUTPUTS = 20
 
 # チェックポイントパスをキャッシュ（毎回ダウンロードしない）
@@ -86,7 +87,7 @@ def synthesize_text_lines(
 def _voice_list_dropdown() -> gr.Dropdown:
     return gr.Dropdown(
         label="TTSボイス名",
-        choices=get_voice_file_choices(),
+        choices=get_voice_file_choices(VOICES_DIR),
         value=NO_VOICE_OPTION,
     )
 

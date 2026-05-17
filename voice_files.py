@@ -2,16 +2,15 @@ from pathlib import Path
 
 NO_VOICE_OPTION = "無指定"
 VOICE_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg"}
-VOICES_DIR = Path("voices")
 
 
-def get_voice_file_choices() -> list[str]:
-    if not VOICES_DIR.exists():
+def get_voice_file_choices(voices_dir: Path) -> list[str]:
+    if not voices_dir.exists():
         return [NO_VOICE_OPTION]
 
     voice_files = [
-        str(path.relative_to(VOICES_DIR)).replace("\\", "/")
-        for path in VOICES_DIR.rglob("*")
+        str(path.relative_to(voices_dir)).replace("\\", "/")
+        for path in voices_dir.rglob("*")
         if path.is_file() and path.suffix.lower() in VOICE_EXTENSIONS
     ]
     voice_files.sort()
