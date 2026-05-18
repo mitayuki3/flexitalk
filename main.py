@@ -3,6 +3,7 @@ Irodori-TTS ベースモデルを使用した Gradio GUI
 """
 
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -259,7 +260,26 @@ with gr.Blocks(title="FlexiTalk") as demo:
     )
 
 
+def load_model():
+    ckpt_path = _get_checkpoint_path()
+    key = RuntimeKey(
+        checkpoint=ckpt_path,
+        model_device=MODEL_DEVICE,
+        codec_device=CODEC_DEVICE,
+        model_precision=MODEL_PRECISION,
+        codec_precision=CODEC_PRECISION,
+    )
+    print(f"loading model {ckpt_path}...")
+    runtime, _ = get_cached_runtime(key)
+    print("model loaded")
+
+
 def main() -> None:
+    # UI起動前にバックグラウンド開始
+    threading.Thread(
+        target=load_model,
+        daemon=True
+    ).start()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     VOICES_DIR.mkdir(parents=True, exist_ok=True)
     demo.launch(
