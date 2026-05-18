@@ -61,6 +61,7 @@ def _extract_non_empty_lines(text: str) -> list[str]:
 
 
 def synthesize_text_lines(
+    text_list: list[str],
     audio_outputs: list[str],
     text: str,
     voice_name: str,
@@ -82,6 +83,8 @@ def synthesize_text_lines(
         raise gr.Error("テキストを入力してください。")
     if len(lines) > MAX_AUDIO_OUTPUTS:
         raise gr.Error(f"最大 {MAX_AUDIO_OUTPUTS} 行までです。")
+    text_list = list(text_list) + lines[:MAX_AUDIO_OUTPUTS]
+    yield [text_list, audio_outputs, last_audio_path]
 
     for i in range(min(len(lines), MAX_AUDIO_OUTPUTS)):
         if use_last_audio and last_audio_path:
@@ -96,7 +99,7 @@ def synthesize_text_lines(
         )
         audio_outputs.append(audio)
         last_audio_path = audio
-        yield [audio_outputs, last_audio_path]
+        yield [text_list, audio_outputs, last_audio_path]
 
 
 def _voice_list_dropdown() -> gr.Dropdown:
@@ -165,6 +168,8 @@ def synthesize(
 
 # ── UI 構築 ───────────────────────────────────────────
 with gr.Blocks(title="FlexiTalk") as demo:
+    # 生成されたテキストのリスト
+    text_list = gr.State([])
     # 生成された音声ファイルのパスのリスト
     audio_outputs = gr.State([])
     # 最後に合成した音声のパス
@@ -224,15 +229,20 @@ with gr.Blocks(title="FlexiTalk") as demo:
                 )
         with gr.Column(scale=1):
 
-            @gr.render(inputs=audio_outputs)
-            def render_audio_outputs(audio_list) -> None:
-                for i, audio in enumerate(audio_list):
-                    gr.Audio(
-                        value=audio,
-                        label=f"生成音声 {i + 1}",
-                        interactive=False,
-                        min_width=160,
-                    )
+            @gr.render(inputs=[text_list, audio_outputs])
+            def render_audio_outputs(_text_list, audio_list) -> None:
+                with gr.Column():
+                    for i, text in enumerate(_text_list):
+                        audio = audio_list[i] if i < len(audio_list) else None
+                        if audio is None:
+                            gr.Markdown(f"**合成中:** {text}")
+                        else:
+                            gr.Audio(
+                                key=f"audio-{i}",
+                                value=audio,
+                                label=text,
+                                interactive=False,
+                            )
 
             erase_history_btn = gr.Button(
                 "🗑️ 履歴を消去",
@@ -247,6 +257,7 @@ with gr.Blocks(title="FlexiTalk") as demo:
     synthesize_btn.click(
         fn=synthesize_text_lines,
         inputs=[
+            text_list,
             audio_outputs,
             text_input,
             voice_dropdown,
@@ -257,13 +268,14 @@ with gr.Blocks(title="FlexiTalk") as demo:
             speaker_cfg_scale_slider,
             output_format_radio,
         ],
-        outputs=[audio_outputs, last_audio_path],
+        outputs=[text_list, audio_outputs, last_audio_path],
     )
 
     # Enter キーでも合成実行
     text_input.submit(
         fn=synthesize_text_lines,
         inputs=[
+            text_list,
             audio_outputs,
             text_input,
             voice_dropdown,
@@ -274,14 +286,14 @@ with gr.Blocks(title="FlexiTalk") as demo:
             speaker_cfg_scale_slider,
             output_format_radio,
         ],
-        outputs=[audio_outputs, last_audio_path],
+        outputs=[text_list, audio_outputs, last_audio_path],
     )
 
     # 履歴を消去ボタン
     erase_history_btn.click(
-        fn=lambda: ([], ""),
+        fn=lambda: ([], [], ""),
         inputs=[],
-        outputs=[audio_outputs, last_audio_path],
+        outputs=[text_list, audio_outputs, last_audio_path],
     )
 
 
