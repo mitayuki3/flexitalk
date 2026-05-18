@@ -64,6 +64,8 @@ def synthesize_text_lines(
     text: str,
     voice_name: str,
     num_steps: int = 20,
+    text_cfg_scale: float = 3.0,
+    speaker_cfg_scale: float = 5.0,
     output_format: str = "ogg",
 ):
     """テキストを行ごとに分割して合成し、生成された音声ファイルのパスをリストに追加して返すジェネレーター
@@ -79,7 +81,14 @@ def synthesize_text_lines(
         raise gr.Error(f"最大 {MAX_AUDIO_OUTPUTS} 行までです。")
 
     for i in range(min(len(lines), MAX_AUDIO_OUTPUTS)):
-        audio = synthesize(lines[i], voice_name, num_steps, output_format)
+        audio = synthesize(
+            lines[i],
+            voice_name,
+            num_steps,
+            text_cfg_scale,
+            speaker_cfg_scale,
+            output_format,
+        )
         audio_outputs.append(audio)
         yield audio_outputs
 
@@ -93,7 +102,12 @@ def _voice_list_dropdown() -> gr.Dropdown:
 
 
 def synthesize(
-    text: str, voice_name: str, num_steps: int = 20, output_format: str = "ogg"
+    text: str,
+    voice_name: str,
+    num_steps: int = 20,
+    text_cfg_scale: float = 3.0,
+    speaker_cfg_scale: float = 5.0,
+    output_format: str = "ogg",
 ) -> str:
     """テキストとボイス名を受け取り、指定された形式の音声ファイルのパスを返す。
 
@@ -124,6 +138,8 @@ def synthesize(
         ref_wav=ref_wav,
         no_ref=voice_name == NO_VOICE_OPTION,
         num_steps=num_steps,
+        cfg_scale_text=text_cfg_scale,
+        cfg_scale_speaker=speaker_cfg_scale,
     )
     result = runtime.synthesize(req)
 
@@ -163,6 +179,20 @@ with gr.Blocks(title="FlexiTalk") as demo:
                 maximum=100,
                 value=20,
                 step=1,
+            )
+            text_cfg_scale_slider = gr.Slider(
+                label="Text CFG Scale",
+                minimum=0.0,
+                maximum=10.0,
+                value=3.0,
+                step=1/4,
+            )
+            speaker_cfg_scale_slider = gr.Slider(
+                label="Speaker CFG Scale",
+                minimum=0.0,
+                maximum=10.0,
+                value=3.0,
+                step=1/4,
             )
             output_format_radio = gr.Radio(
                 label="出力形式",
@@ -206,6 +236,8 @@ with gr.Blocks(title="FlexiTalk") as demo:
             text_input,
             voice_dropdown,
             num_steps_slider,
+            text_cfg_scale_slider,
+            speaker_cfg_scale_slider,
             output_format_radio,
         ],
         outputs=audio_outputs,
@@ -219,6 +251,8 @@ with gr.Blocks(title="FlexiTalk") as demo:
             text_input,
             voice_dropdown,
             num_steps_slider,
+            text_cfg_scale_slider,
+            speaker_cfg_scale_slider,
             output_format_radio,
         ],
         outputs=audio_outputs,
