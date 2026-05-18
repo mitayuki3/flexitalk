@@ -64,6 +64,8 @@ def synthesize_text_lines(
     audio_outputs: list[str],
     text: str,
     voice_name: str,
+    use_last_audio: bool,
+    last_audio_path: str,
     num_steps: int = 20,
     text_cfg_scale: float = 3.0,
     speaker_cfg_scale: float = 5.0,
@@ -82,6 +84,8 @@ def synthesize_text_lines(
         raise gr.Error(f"最大 {MAX_AUDIO_OUTPUTS} 行までです。")
 
     for i in range(min(len(lines), MAX_AUDIO_OUTPUTS)):
+        if use_last_audio and last_audio_path:
+            voice_name = last_audio_path
         audio = synthesize(
             lines[i],
             voice_name,
@@ -91,12 +95,13 @@ def synthesize_text_lines(
             output_format,
         )
         audio_outputs.append(audio)
-        yield audio_outputs
+        last_audio_path = audio
+        yield [audio_outputs, last_audio_path]
 
 
 def _voice_list_dropdown() -> gr.Dropdown:
     return gr.Dropdown(
-        label="TTSボイス名",
+        label="リファレンスボイス名",
         choices=get_voice_file_choices(VOICES_DIR),
         value=NO_VOICE_OPTION,
     )
@@ -162,6 +167,8 @@ def synthesize(
 with gr.Blocks(title="FlexiTalk") as demo:
     # 生成された音声ファイルのパスのリスト
     audio_outputs = gr.State([])
+    # 最後に合成した音声のパス
+    last_audio_path = gr.State("")
     with gr.Row():
         with gr.Column(scale=1):
             text_input = gr.Textbox(
@@ -170,6 +177,10 @@ with gr.Blocks(title="FlexiTalk") as demo:
                 lines=5,
             )
             voice_dropdown = _voice_list_dropdown()
+            use_last_audio_checkbox = gr.Checkbox(
+                label="最後に合成した音声をリファレンスにする",
+                value=False,
+            )
             refresh_voice_list_btn = gr.Button(
                 "一覧更新",
                 variant="secondary",
@@ -236,12 +247,14 @@ with gr.Blocks(title="FlexiTalk") as demo:
             audio_outputs,
             text_input,
             voice_dropdown,
+            use_last_audio_checkbox,
+            last_audio_path,
             num_steps_slider,
             text_cfg_scale_slider,
             speaker_cfg_scale_slider,
             output_format_radio,
         ],
-        outputs=audio_outputs,
+        outputs=[audio_outputs, last_audio_path],
     )
 
     # Enter キーでも合成実行
@@ -251,12 +264,14 @@ with gr.Blocks(title="FlexiTalk") as demo:
             audio_outputs,
             text_input,
             voice_dropdown,
+            use_last_audio_checkbox,
+            last_audio_path,
             num_steps_slider,
             text_cfg_scale_slider,
             speaker_cfg_scale_slider,
             output_format_radio,
         ],
-        outputs=audio_outputs,
+        outputs=[audio_outputs, last_audio_path],
     )
 
 
