@@ -228,6 +228,9 @@ with gr.Blocks(title="FlexiTalk") as demo:
                         min_width=160,
                     )
 
+            erase_history_btn = gr.Button(
+                "🗑️ 履歴を消去",
+            )
             with gr.Accordion("情報", open=False):
                 gr.Markdown(
                     f"- モデル: `{HF_REPO_ID}`\n"
@@ -271,6 +274,13 @@ with gr.Blocks(title="FlexiTalk") as demo:
             speaker_cfg_scale_slider,
             output_format_radio,
         ],
+        outputs=[audio_outputs, last_audio_path],
+    )
+
+    # 履歴を消去ボタン
+    erase_history_btn.click(
+        fn=lambda: ([], ""),
+        inputs=[],
         outputs=[audio_outputs, last_audio_path],
     )
 
